@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# cSpell:ignore clearfix dotenv MYANIMELIST
+# cSpell:ignore clearfix dotenv MYANIMELIST markdownify
 
 from bs4 import BeautifulSoup
 from discord_webhook import DiscordWebhook
@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from email.policy import strict
 import os
 import requests
+from markdownify import markdownify
 
 load_dotenv()
 
@@ -18,15 +19,20 @@ soup = BeautifulSoup(r.text, features="html.parser")
 
 userComments = soup.find("div", {"class": "user-comments"})
 commentAuthor = userComments.find_all("a", {"class": "fw-b"})
+commentTime = userComments.find_all("span", {"class": "di-ib"})
 commentMessage = userComments.find_all("div", {"class": "comment-text"})
 
 cDict = []
-for author, message in zip(commentAuthor, commentMessage):
+for author, cmTime, message in zip(commentAuthor, commentTime, commentMessage):
+    mdFy = markdownify(str(message).strip())
     comments = {
         'Author': author.text,
-        'Content': message.text.strip()
+        'Time': cmTime.text,
+        'Content': str(mdFy).removeprefix('\n ').replace('\n\n', '\n')
     }
     cDict.append(comments)
+
+print(cDict)
 
 
 def write_csv(items, path):
@@ -53,6 +59,7 @@ write_csv(cDict, "comments.csv")
 for i in cDict:
     content = """
 **Author**: """ + i['Author'] + """
+**Time**: """ + i['Time'] + """
 **Content**: """ + i['Content']
     webhook = DiscordWebhook(url=os.environ.get(
         'DISCORD_WEBHOOK_URI'), rate_limit_retry=True, content=content)
